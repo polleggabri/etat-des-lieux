@@ -65,12 +65,17 @@
     padding:10px 14px;display:flex;gap:8px;z-index:60;box-shadow:0 -2px 10px rgba(0,0,0,.06);}
   .btn{flex:1;padding:14px;border:0;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;}
   .btn-html{background:#6f42c1;color:#fff;}
+  .btn-save{background:var(--vert);color:#fff;max-width:56px;font-size:20px;}
   .btn-sec{background:var(--bleu-clair);color:var(--bleu);max-width:56px;font-size:20px;}
+  .savepill{position:fixed;bottom:112px;right:14px;background:#fff;border:1px solid var(--bord);
+    border-radius:20px;font-size:11px;color:#8894a5;padding:4px 10px;z-index:55;box-shadow:var(--ombre);}
   .hint{font-size:12px;color:#8894a5;background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:14px;border:1px solid var(--bord);}
   .toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;
     padding:11px 18px;border-radius:24px;font-size:14px;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center;}
   .toast.show{opacity:1;}
-  /* zone HTML/PDF cachée */
+  /* iframe cachée pour l'impression (n'affecte pas la page) */
+  #printFrame{position:fixed;width:0;height:0;border:0;left:-9999px;top:0;}
+  /* zone HTML cachée pour la génération du document */
   #pdf{position:fixed;left:-9999px;top:0;width:794px;background:#fff;color:#000;font-size:12px;padding:28px;}
   #pdf h1{font-size:18px;text-align:center;color:#1d4e89;margin:0 0 2px;}
   #pdf .sub{text-align:center;font-size:11px;color:#555;margin-bottom:12px;}
@@ -85,6 +90,11 @@
   #pdf .sigblk>div{flex:1;text-align:center;}
   #pdf .sigblk img{max-width:100%;height:90px;object-fit:contain;border-bottom:1px solid #000;}
   #pdf .legal{font-size:9px;color:#444;margin-top:14px;text-align:justify;line-height:1.35;}
+  #pdf .synth{border:1px solid #c9a227;background:#fff8e6;border-radius:4px;padding:8px 10px;margin:6px 0 12px;}
+  #pdf .synth h3{margin:0 0 5px;font-size:11px;color:#8a6d00;}
+  #pdf .synth ul{margin:0;padding-left:16px;}
+  #pdf .synth li{font-size:10px;margin-bottom:2px;}
+  #pdf .synth .ok{color:#2e7d5b;font-size:10px;}
 </style>
 </head>
 <body>
@@ -99,7 +109,7 @@
 </header>
 
 <main>
-  <div class="hint">📱 Nouveau bail — module vierge. Renseignez la locataire, l'état de chaque élément et les photos. Astuce : <b>Partager → Sur l'écran d'accueil</b> pour l'installer comme une app.</div>
+  <div class="hint">📱 Nouveau bail — module vierge. Vos saisies et photos sont enregistrées automatiquement sur ce téléphone. Astuce : <b>Partager → Sur l'écran d'accueil</b> pour l'installer comme une app.<br>💾 Le bouton vert crée une <b>copie de secours</b> (fichier). Pour la recharger : <a href="#" onclick="ouvrirRestauration();return false;"><b>Restaurer une sauvegarde</b></a>.</div>
 
   <!-- ENTETE -->
   <div class="card">
@@ -170,126 +180,78 @@
 <footer>
   <button class="btn btn-sec" onclick="resetAll()" title="Nouvel état des lieux">🗑️</button>
   <button class="btn btn-sec" onclick="printDoc()" title="Imprimer / enregistrer PDF">🖨️</button>
+  <button class="btn btn-save" onclick="sauvegardeSecours()" title="Copie de secours (fichier de sauvegarde)">💾</button>
   <button class="btn btn-html" onclick="exporterHTML()">📝 Exporter / partager le HTML</button>
 </footer>
 
+<input type="file" id="restoreInput" accept=".edlbak,application/json" style="display:none" onchange="restaurerSecours(this)">
+
+<div class="savepill" id="savepill">Sauvegarde auto</div>
+<iframe id="printFrame"></iframe>
 <div id="pdf"></div>
 <div class="toast" id="toast"></div>
 
 <script>
-/* ---------- MODÈLE VIERGE (structure du studio, sans états ni photos) ---------- */
+/* ---------- MODÈLE VIERGE (structure du studio) ---------- */
 const ETATS = ["", "Neuf", "Très bon état", "Bon état", "État d'usage", "Mauvais état", "Absent / HS"];
 const TEMPLATE = [
  {piece:"Cuisine", groupes:[
    {titre:"Décoration", items:[
-     {n:"Crédence", nat:""},
-     {n:"Sol", nat:"Carrelage"},
-     {n:"Plinthe", nat:"Carrelage"},
-     {n:"Mur", nat:"Peinture blanche"},
-     {n:"Plafond", nat:"Peinture blanche"},
+     {n:"Crédence", nat:""},{n:"Sol", nat:"Carrelage"},{n:"Plinthe", nat:"Carrelage"},
+     {n:"Mur", nat:"Peinture blanche"},{n:"Plafond", nat:"Peinture blanche"},
    ]},
    {titre:"Électricité & chauffage", items:[
-     {n:"Prise électrique", q:"7"},
-     {n:"Néon", q:"1"},
-     {n:"Douille + ampoule", q:"1"},
-     {n:"Interrupteur VMC", q:"1"},
-     {n:"VMC", q:"1"},
+     {n:"Prise électrique", q:"7"},{n:"Néon", q:"1"},{n:"Douille + ampoule", q:"1"},
+     {n:"Interrupteur VMC", q:"1"},{n:"VMC", q:"1"},
    ]},
    {titre:"Équipement", items:[
-     {n:"Hotte", nat:"Inoval"},
-     {n:"Frigo Top"},
-     {n:"Plaque de cuisson"},
-     {n:"Meuble sous évier", q:"1"},
-     {n:"Mitigeur évier", q:"1"},
-     {n:"Siphon", q:"1"},
-     {n:"Plan de travail"},
-     {n:"Joints"},
-     {n:"Arrivée + sortie d'eau", q:"1"},
-     {n:"Bac évier", q:"1"},
-     {n:"Meuble emplacement micro-ondes", q:"1"},
-     {n:"Meuble haut 1 porte 1 tablette", q:"3"},
+     {n:"Hotte", nat:"Inoval"},{n:"Frigo Top"},{n:"Plaque de cuisson"},{n:"Meuble sous évier", q:"1"},
+     {n:"Mitigeur évier", q:"1"},{n:"Siphon", q:"1"},{n:"Plan de travail"},{n:"Joints"},
+     {n:"Arrivée + sortie d'eau", q:"1"},{n:"Bac évier", q:"1"},
+     {n:"Meuble emplacement micro-ondes", q:"1"},{n:"Meuble haut 1 porte 1 tablette", q:"3"},
    ]},
  ]},
  {piece:"Séjour / Salon", groupes:[
    {titre:"Décoration", items:[
-     {n:"Fenêtre", nat:"Double vitrage PVC"},
-     {n:"Porte (avec judas)"},
-     {n:"Sol", nat:"Carrelage"},
-     {n:"Plinthe", nat:"Carrelage"},
-     {n:"Mur", nat:"Peinture blanche"},
-     {n:"Plafond", nat:"Peinture blanche"},
+     {n:"Fenêtre", nat:"Double vitrage PVC"},{n:"Porte (avec judas)"},{n:"Sol", nat:"Carrelage"},
+     {n:"Plinthe", nat:"Carrelage"},{n:"Mur", nat:"Peinture blanche"},{n:"Plafond", nat:"Peinture blanche"},
    ]},
    {titre:"Électricité & chauffage", items:[
-     {n:"Prise électrique", q:"7"},
-     {n:"Douille + ampoule", q:"2"},
-     {n:"Climatiseur mural Atlantic", q:"1"},
-     {n:"Télécommande climatiseur", q:"1"},
-     {n:"Coffrage volet roulant", q:"1"},
-     {n:"Interrupteur volet roulant", q:"1"},
-     {n:"Volet roulant électrique", q:"1"},
-     {n:"Interrupteurs", q:"2"},
-     {n:"Interrupteur lumière extérieure", q:"1"},
+     {n:"Prise électrique", q:"7"},{n:"Douille + ampoule", q:"2"},{n:"Climatiseur mural Atlantic", q:"1"},
+     {n:"Télécommande climatiseur", q:"1"},{n:"Coffrage volet roulant", q:"1"},{n:"Interrupteur volet roulant", q:"1"},
+     {n:"Volet roulant électrique", q:"1"},{n:"Interrupteurs", q:"2"},{n:"Interrupteur lumière extérieure", q:"1"},
      {n:"DAAF (détecteur fumée)", q:"1"},
    ]},
  ]},
  {piece:"Salle de bains", groupes:[
    {titre:"Décoration", items:[
-     {n:"Porte"},
-     {n:"Sol", nat:"Carrelage"},
-     {n:"Plinthe", nat:"Carrelage"},
-     {n:"Mur", nat:"Peinture blanche"},
-     {n:"Plafond", nat:"Peinture blanche"},
+     {n:"Porte"},{n:"Sol", nat:"Carrelage"},{n:"Plinthe", nat:"Carrelage"},
+     {n:"Mur", nat:"Peinture blanche"},{n:"Plafond", nat:"Peinture blanche"},
    ]},
    {titre:"Électricité & chauffage", items:[
-     {n:"Prise électrique"},
-     {n:"Douille + ampoule", q:"1"},
-     {n:"Sèche-serviette électrique", q:"1"},
-     {n:"Interrupteur"},
+     {n:"Prise électrique"},{n:"Douille + ampoule", q:"1"},{n:"Sèche-serviette électrique", q:"1"},{n:"Interrupteur"},
    ]},
    {titre:"Équipement", items:[
-     {n:"WC"},
-     {n:"Abattant"},
-     {n:"Cuvette"},
-     {n:"Chasse d'eau"},
-     {n:"Barre de douche"},
-     {n:"Crédence douche"},
-     {n:"Flexible"},
-     {n:"Mitigeur douche"},
-     {n:"Joints douche"},
-     {n:"Plan de vasque"},
-     {n:"Lavabo"},
-     {n:"Bonde lavabo"},
-     {n:"Joints lavabo"},
-     {n:"Meuble sous vasque"},
-     {n:"Siphon lavabo"},
-     {n:"Miroir avec applique lumineuse"},
-     {n:"VMC"},
+     {n:"WC"},{n:"Abattant"},{n:"Cuvette"},{n:"Chasse d'eau"},{n:"Barre de douche"},{n:"Crédence douche"},
+     {n:"Flexible"},{n:"Mitigeur douche"},{n:"Joints douche"},{n:"Plan de vasque"},{n:"Lavabo"},
+     {n:"Bonde lavabo"},{n:"Joints lavabo"},{n:"Meuble sous vasque"},{n:"Siphon lavabo"},
+     {n:"Miroir avec applique lumineuse"},{n:"VMC"},
    ]},
  ]},
  {piece:"Balcon", groupes:[
    {titre:"", items:[
-     {n:"Sol", nat:"Dalles sur plots"},
-     {n:"Applique"},
-     {n:"Unité extérieure climatiseur"},
-     {n:"Mur", nat:"Crépi"},
-     {n:"Plafond", nat:"Peinture blanche"},
-     {n:"Garde-corps"},
+     {n:"Sol", nat:"Dalles sur plots"},{n:"Applique"},{n:"Unité extérieure climatiseur"},
+     {n:"Mur", nat:"Crépi"},{n:"Plafond", nat:"Peinture blanche"},{n:"Garde-corps"},
    ]},
  ]},
  {piece:"Parking", groupes:[
-   {titre:"", items:[
-     {n:"Sol", nat:"Brut"},
-     {n:"Mur", nat:"Brut"},
-   ]},
+   {titre:"", items:[{n:"Sol", nat:"Brut"},{n:"Mur", nat:"Brut"}]},
  ]},
  {piece:"Boîte aux lettres", groupes:[
-   {titre:"", items:[
-     {n:"Porte"},
-     {n:"Serrure"},
-   ]},
+   {titre:"", items:[{n:"Porte"},{n:"Serrure"}]},
  ]},
 ];
-/* Numéros de compteurs conservés, index vierge (à relever à l'entrée) */
+/* Numéros de compteurs conservés, index vierge */
 const COMPTEURS = [
   {t:"Eau froide", num:"183698", idx:""},
   {t:"Électrique heure pleine", num:"24389435409556", idx:""},
@@ -304,11 +266,15 @@ const CLES = [
 /* ---------- ÉTAT ---------- */
 let mode = "entree";
 const store = { photos:{} };
-const KEY = "edl_studio_nouvelle_loc_v1";
+const DBNAME = "edl_studio_db";
+const RECORD = "nouvelle_locataire_v1";
 
 /* ---------- RENDU ---------- */
 function esc(s){return (s||"").replace(/"/g,'&quot;');}
-function optEtats(sel){return ETATS.map(e=>`<option ${e===sel?'selected':''}>${e||'— choisir —'}</option>`).join('');}
+/* FIX bug placeholder: chaque option a une value; l'option vide vaut "" */
+function optEtats(sel){
+  return ETATS.map(e=>`<option value="${esc(e)}" ${e===sel?'selected':''}>${e||'— choisir —'}</option>`).join('');
+}
 
 function renderPieces(){
   let html="";
@@ -316,10 +282,7 @@ function renderPieces(){
     html+=`<div class="card"><h2 onclick="toggle(this)">${p.piece} <span class="chev">▾</span></h2><div class="body">`;
     p.groupes.forEach((g,gi)=>{
       if(g.titre) html+=`<div class="subttl">${g.titre}</div>`;
-      g.items.forEach((it,ii)=>{
-        const id=`p${pi}_g${gi}_i${ii}`;
-        html+=itemHTML(id,it);
-      });
+      g.items.forEach((it,ii)=>{ html+=itemHTML(`p${pi}_g${gi}_i${ii}`,it); });
       html+=`<button class="addItem" onclick="addItem(${pi},${gi})">＋ Ajouter un élément</button>`;
     });
     html+=`</div></div>`;
@@ -381,7 +344,7 @@ function addItem(pi,gi){
   saveState();
 }
 
-/* ---------- PHOTOS ---------- */
+/* ---------- PHOTOS (compression renforcée pour fiabiliser le stockage) ---------- */
 function addPhoto(id,input){
   const files=[...input.files];
   if(!store.photos[id]) store.photos[id]=[];
@@ -402,11 +365,11 @@ function addPhoto(id,input){
 function compress(dataUrl,cb){
   const img=new Image();
   img.onload=()=>{
-    const max=1000; let{width:w,height:h}=img;
+    const max=1400; let{width:w,height:h}=img;
     if(w>h && w>max){h=h*max/w;w=max;} else if(h>max){w=w*max/h;h=max;}
     const cv=document.createElement('canvas');cv.width=w;cv.height=h;
     cv.getContext('2d').drawImage(img,0,0,w,h);
-    cb(cv.toDataURL('image/jpeg',0.7));
+    cb(cv.toDataURL('image/jpeg',0.62));
   };
   img.src=dataUrl;
 }
@@ -436,7 +399,7 @@ function initSig(cid){
 }
 function clearSig(cid){const cv=document.getElementById(cid);cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv.dataset.signed="";saveState();}
 
-/* ---------- MODE ---------- */
+/* ---------- MODE / UI ---------- */
 function setMode(m){
   mode=m;
   document.getElementById('mEntree').classList.toggle('on',m==='entree');
@@ -445,34 +408,73 @@ function setMode(m){
 }
 function toggle(h){h.parentNode.classList.toggle('closed');}
 
-/* ---------- SAUVEGARDE LOCALE ---------- */
+/* ---------- STOCKAGE FIABLE via IndexedDB (gère plusieurs Mo de photos) ---------- */
+let _db=null;
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    if(_db)return resolve(_db);
+    const req=indexedDB.open(DBNAME,1);
+    req.onupgradeneeded=e=>{const db=e.target.result; if(!db.objectStoreNames.contains('state')) db.createObjectStore('state');};
+    req.onsuccess=e=>{_db=e.target.result;resolve(_db);};
+    req.onerror=e=>reject(e);
+  });
+}
+function collectState(){
+  const data={mode,fields:{},selects:{},photos:store.photos,sig:{}};
+  document.querySelectorAll('input[type=text],input[type=date],textarea').forEach(el=>{if(el.id)data.fields[el.id]=el.value;});
+  document.querySelectorAll('select').forEach(el=>{if(el.id)data.selects[el.id]=el.value;});
+  ['sigProp','sigLoc'].forEach(id=>{const cv=document.getElementById(id);if(cv&&cv.dataset.signed)data.sig[id]=cv.toDataURL();});
+  return data;
+}
 function saveState(){
-  try{
-    const data={mode,fields:{},selects:{},photos:store.photos,sig:{}};
-    document.querySelectorAll('input[type=text],input[type=date],textarea').forEach(el=>{if(el.id)data.fields[el.id]=el.value;});
-    document.querySelectorAll('select').forEach(el=>{if(el.id)data.selects[el.id]=el.value;});
-    ['sigProp','sigLoc'].forEach(id=>{const cv=document.getElementById(id);if(cv&&cv.dataset.signed)data.sig[id]=cv.toDataURL();});
-    localStorage.setItem(KEY,JSON.stringify(data));
-  }catch(e){}
+  const pill=document.getElementById('savepill');
+  const data=collectState();
+  openDB().then(db=>{
+    const tx=db.transaction('state','readwrite');
+    tx.objectStore('state').put(data,RECORD);
+    tx.oncomplete=()=>{ if(pill){pill.textContent='Enregistré ✓'; setTimeout(()=>pill.textContent='Sauvegarde auto',1200);} };
+    tx.onerror=()=>{ if(pill)pill.textContent='⚠️ Sauvegarde échouée'; };
+  }).catch(()=>{
+    // Repli localStorage si IndexedDB indisponible
+    try{ localStorage.setItem(DBNAME+'_'+RECORD, JSON.stringify(data)); }
+    catch(e){ if(pill)pill.textContent='⚠️ Stockage plein : exportez'; }
+  });
+}
+function applyState(d){
+  if(!d) return;
+  if(d.mode)setMode(d.mode);
+  if(d.fields)for(const k in d.fields){const el=document.getElementById(k);if(el)el.value=d.fields[k];}
+  if(d.selects)for(const k in d.selects){const el=document.getElementById(k);if(el)el.value=d.selects[k];}
+  if(d.photos){store.photos=d.photos;for(const id in store.photos)renderThumbs(id);}
+  if(d.sig)for(const id in d.sig){const cv=document.getElementById(id);const img=new Image();img.onload=()=>{const r=cv.getBoundingClientRect();cv.getContext('2d').drawImage(img,0,0,r.width,r.height);};img.src=d.sig[id];cv.dataset.signed="1";}
 }
 function loadState(){
-  try{
-    const d=JSON.parse(localStorage.getItem(KEY)||"{}");
-    if(d.mode)setMode(d.mode);
-    if(d.fields)for(const k in d.fields){const el=document.getElementById(k);if(el)el.value=d.fields[k];}
-    if(d.selects)for(const k in d.selects){const el=document.getElementById(k);if(el)el.value=d.selects[k];}
-    if(d.photos){store.photos=d.photos;for(const id in store.photos)renderThumbs(id);}
-    if(d.sig)for(const id in d.sig){const cv=document.getElementById(id);const img=new Image();img.onload=()=>{const r=cv.getBoundingClientRect();cv.getContext('2d').drawImage(img,0,0,r.width,r.height);};img.src=d.sig[id];cv.dataset.signed="1";}
-  }catch(e){}
+  openDB().then(db=>{
+    const tx=db.transaction('state','readonly');
+    const rq=tx.objectStore('state').get(RECORD);
+    rq.onsuccess=()=>{
+      if(rq.result){ applyState(rq.result); }
+      else{ // migration éventuelle depuis localStorage
+        try{const ls=localStorage.getItem(DBNAME+'_'+RECORD); if(ls)applyState(JSON.parse(ls));}catch(e){}
+      }
+    };
+  }).catch(()=>{
+    try{const ls=localStorage.getItem(DBNAME+'_'+RECORD); if(ls)applyState(JSON.parse(ls));}catch(e){}
+  });
 }
 document.addEventListener('input',()=>{clearTimeout(window._sv);window._sv=setTimeout(saveState,400);});
 
 function resetAll(){
   if(!confirm("Démarrer un nouvel état des lieux vierge ? Les données actuelles seront effacées."))return;
-  localStorage.removeItem(KEY);location.reload();
+  openDB().then(db=>{
+    const tx=db.transaction('state','readwrite');
+    tx.objectStore('state').delete(RECORD);
+    tx.oncomplete=()=>{ try{localStorage.removeItem(DBNAME+'_'+RECORD);}catch(e){} location.reload(); };
+  }).catch(()=>{ try{localStorage.removeItem(DBNAME+'_'+RECORD);}catch(e){} location.reload(); });
 }
 
 /* ---------- CONSTRUCTION DU DOCUMENT ---------- */
+function cleanVal(v){ v=(v||'').trim(); return v; } /* les selects renvoient "" quand vide grâce aux value="" */
 function buildPdfHTML(){
   const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
   const dateTxt=g('f_date')||new Date().toLocaleDateString('fr-FR');
@@ -487,6 +489,31 @@ function buildPdfHTML(){
       <tr><td>Locataire</td><td colspan="3">${g('f_loc')||'—'}</td></tr>
     </table>`;
 
+  /* --- Synthèse automatique des écarts entrée/sortie (uniquement en mode sortie) --- */
+  if(mode==='sortie'){
+    const RANK={'':0,'— choisir —':0,'Neuf':5,'Très bon état':4,'Bon état':3,"État d'usage":2,'Mauvais état':1,'Absent / HS':0};
+    const ecarts=[];
+    document.querySelectorAll('#pieces .card').forEach(card=>{
+      const piece=card.querySelector('h2').childNodes[0].textContent.trim();
+      card.querySelectorAll('.item').forEach(item=>{
+        const id=item.id.replace('box_','');
+        const nomEl=item.querySelector('.nom');
+        const nom = nomEl.querySelector('input')? nomEl.querySelector('input').value : nomEl.childNodes[0].textContent.trim();
+        const ee=cleanVal((document.getElementById(id+'_ee')||{}).value);
+        const es=cleanVal((document.getElementById(id+'_es')||{}).value);
+        const com=(document.getElementById(id+'_c')||{}).value||'';
+        if(ee && es && RANK[es]<RANK[ee]){
+          ecarts.push(`<li><b>${piece} — ${nom}</b> : ${ee} ➜ ${es}${com?` <i style="color:#666">(${com})</i>`:''}</li>`);
+        }
+      });
+    });
+    if(ecarts.length){
+      h+=`<div class="synth"><h3>⚠️ Synthèse des dégradations constatées (${ecarts.length})</h3><ul>${ecarts.join('')}</ul></div>`;
+    }else{
+      h+=`<div class="synth"><h3>Synthèse entrée / sortie</h3><div class="ok">Aucune dégradation constatée : le logement est restitué dans un état équivalent à l'entrée.</div></div>`;
+    }
+  }
+
   document.querySelectorAll('#pieces .card').forEach(card=>{
     const titre=card.querySelector('h2').childNodes[0].textContent.trim();
     h+=`<h2>${titre}</h2>`;
@@ -497,8 +524,8 @@ function buildPdfHTML(){
       let nom = nomEl.querySelector('input')? nomEl.querySelector('input').value : nomEl.childNodes[0].textContent.trim();
       const qEl=nomEl.querySelector('.q'); const q=qEl?qEl.textContent.replace('×',''):'';
       const nat=(document.getElementById(id+'_nat')||{}).value||'';
-      const ee=(document.getElementById(id+'_ee')||{}).value||'';
-      const es=(document.getElementById(id+'_es')||{}).value||'';
+      const ee=cleanVal((document.getElementById(id+'_ee')||{}).value);
+      const es=cleanVal((document.getElementById(id+'_es')||{}).value);
       const c=(document.getElementById(id+'_c')||{}).value||'';
       const ph=(store.photos[id]||[]).map(d=>`<img src="${d}">`).join('');
       rows+=`<tr><td>${nom}${q?' ×'+q:''}${nat?'<br><i style="color:#666">'+nat+'</i>':''}</td>
@@ -530,19 +557,14 @@ function buildPdfHTML(){
   return h;
 }
 
-/* ---------- EXPORT HTML ---------- */
+/* ---------- EXPORT HTML (ne modifie jamais le formulaire) ---------- */
 function buildStandaloneHTML(){
-  saveState();
   const contenu=buildPdfHTML();
   const dateTxt=(document.getElementById('f_date').value||new Date().toISOString().slice(0,10));
   const typeTxt=mode==='entree'?'ENTRÉE':'SORTIE';
   const titre=`État des lieux ${typeTxt} - Studio Castelnau - ${dateTxt}`;
   return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${titre}</title>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${titre}</title>
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;background:#f4f5f7;color:#1f2733;}
   .wrap{max-width:920px;margin:0 auto;background:#fff;padding:22px;}
@@ -560,33 +582,24 @@ function buildStandaloneHTML(){
   .sigblk img{max-width:100%;height:110px;object-fit:contain;border-bottom:1px solid #000;}
   .legal{font-size:11px;color:#444;margin-top:16px;text-align:justify;line-height:1.4;}
   @media(max-width:700px){.wrap{padding:12px;} th,td{font-size:11px;padding:5px;} .pimgs img{width:88px;height:88px;} .sigblk{display:block}.sigblk>div{margin-bottom:16px;}}
-</style>
-</head>
-<body>
-<div class="wrap">
-${contenu}
-</div>
-</body>
-</html>`;
+</style></head><body><div class="wrap">${contenu}</div></body></html>`;
 }
 
 function exporterHTML(){
+  saveState(); // on enregistre AVANT, sans jamais toucher au formulaire
   try{
     const dateTxt=(document.getElementById('f_date').value||new Date().toISOString().slice(0,10));
     const nom=`EDL_${mode}_${dateTxt}.html`;
-    const html=buildStandaloneHTML();
-    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const blob=new Blob([buildStandaloneHTML()],{type:'text/html;charset=utf-8'});
     const file=new File([blob],nom,{type:'text/html'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       navigator.share({files:[file],title:'État des lieux',text:'État des lieux du studio'})
-        .then(()=>toast('HTML prêt à partager ✓')).catch(()=>telechargerHTML(blob,nom));
+        .then(()=>toast('HTML prêt à partager ✓'))
+        .catch(()=>telechargerHTML(blob,nom));
     }else{
       telechargerHTML(blob,nom);
     }
-  }catch(e){
-    console.error(e);
-    toast('Export HTML impossible');
-  }
+  }catch(e){ console.error(e); toast('Export HTML impossible'); }
 }
 function telechargerHTML(blob,nom){
   const url=URL.createObjectURL(blob);
@@ -597,14 +610,52 @@ function telechargerHTML(blob,nom){
   toast('HTML exporté ✓');
 }
 
+/* ---------- IMPRESSION via iframe cachée (FIX : ne quitte plus le formulaire) ---------- */
 function printDoc(){
   saveState();
-  document.getElementById('pdf').innerHTML=buildPdfHTML();
-  const w=window.open('','_print');
-  const css=document.querySelector('style').innerHTML;
-  w.document.write(`<html><head><meta charset="utf-8"><style>${css} #pdf{position:static;left:0;width:100%;}</style></head><body>${document.getElementById('pdf').outerHTML}</body></html>`);
-  w.document.close();
-  setTimeout(()=>{w.focus();w.print();},600);
+  const html=buildStandaloneHTML();
+  const frame=document.getElementById('printFrame');
+  const doc=frame.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(()=>{
+    try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
+    catch(e){ telechargerHTML(new Blob([html],{type:'text/html'}), `EDL_${mode}.html`); }
+  },500);
+}
+
+/* ---------- COPIE DE SECOURS (fichier .edlbak téléchargeable / restaurable) ---------- */
+function sauvegardeSecours(){
+  saveState();
+  try{
+    const data=collectState();
+    const dateTxt=(document.getElementById('f_date').value||new Date().toISOString().slice(0,10));
+    const nom=`Sauvegarde_EDL_${mode}_${dateTxt}.edlbak`;
+    const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    const file=new File([blob],nom,{type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:'Copie de secours état des lieux'})
+        .then(()=>toast('Copie de secours prête ✓'))
+        .catch(()=>telechargerHTML(blob,nom));
+    }else{
+      telechargerHTML(blob,nom);
+    }
+    toast('Copie de secours créée 💾');
+  }catch(e){ console.error(e); toast('Sauvegarde impossible'); }
+}
+function ouvrirRestauration(){ document.getElementById('restoreInput').click(); }
+function restaurerSecours(input){
+  const f=input.files[0]; input.value="";
+  if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      applyState(d);
+      saveState();
+      toast('Sauvegarde restaurée ✓');
+    }catch(err){ toast('Fichier de sauvegarde invalide'); }
+  };
+  r.readAsText(f);
 }
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove('show'),2600);}
