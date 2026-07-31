@@ -109,7 +109,7 @@
 </header>
 
 <main>
-  <div class="hint">📱 Nouveau bail — module vierge. Vos saisies et photos sont enregistrées automatiquement sur ce téléphone. Astuce : <b>Partager → Sur l'écran d'accueil</b> pour l'installer comme une app.<br>💾 Le bouton vert crée une <b>copie de secours</b> (fichier). Pour la recharger : <a href="#" onclick="ouvrirRestauration();return false;"><b>Restaurer une sauvegarde</b></a>.</div>
+  <div class="hint">📱 Nouveau bail — module vierge. Vos saisies et photos sont enregistrées automatiquement sur ce téléphone. Astuce : <b>Partager → Sur l'écran d'accueil</b> pour l'installer comme une app.<br>💾 Le bouton vert crée une <b>copie de secours</b> au format JSON. Pour la recharger : <a href="#" onclick="ouvrirRestauration();return false;"><b>Restaurer une sauvegarde</b></a>.</div>
 
   <!-- ENTETE -->
   <div class="card">
@@ -180,11 +180,11 @@
 <footer>
   <button class="btn btn-sec" onclick="resetAll()" title="Nouvel état des lieux">🗑️</button>
   <button class="btn btn-sec" onclick="printDoc()" title="Imprimer / enregistrer PDF">🖨️</button>
-  <button class="btn btn-save" onclick="sauvegardeSecours()" title="Copie de secours (fichier de sauvegarde)">💾</button>
+  <button class="btn btn-save" onclick="sauvegardeSecours()" title="Copie de secours JSON">💾</button>
   <button class="btn btn-html" onclick="exporterHTML()">📝 Exporter / partager le HTML</button>
 </footer>
 
-<input type="file" id="restoreInput" accept=".edlbak,application/json" style="display:none" onchange="restaurerSecours(this)">
+<input type="file" id="restoreInput" accept=".json,application/json" style="display:none" onchange="restaurerSecours(this)">
 
 <div class="savepill" id="savepill">Sauvegarde auto</div>
 <iframe id="printFrame"></iframe>
@@ -398,6 +398,17 @@ function initSig(cid){
   cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);cv.addEventListener('mouseup',end);
 }
 function clearSig(cid){const cv=document.getElementById(cid);cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv.dataset.signed="";saveState();}
+function sigDataURL(cid){
+  const cv=document.getElementById(cid);
+  if(!cv || !cv.dataset.signed)return '';
+  const out=document.createElement('canvas');
+  out.width=cv.width; out.height=cv.height;
+  const ctx=out.getContext('2d');
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,out.width,out.height);
+  ctx.drawImage(cv,0,0);
+  return out.toDataURL('image/png');
+}
 
 /* ---------- MODE / UI ---------- */
 function setMode(m){
@@ -423,7 +434,7 @@ function collectState(){
   const data={mode,fields:{},selects:{},photos:store.photos,sig:{}};
   document.querySelectorAll('input[type=text],input[type=date],textarea').forEach(el=>{if(el.id)data.fields[el.id]=el.value;});
   document.querySelectorAll('select').forEach(el=>{if(el.id)data.selects[el.id]=el.value;});
-  ['sigProp','sigLoc'].forEach(id=>{const cv=document.getElementById(id);if(cv&&cv.dataset.signed)data.sig[id]=cv.toDataURL();});
+  ['sigProp','sigLoc'].forEach(id=>{const cv=document.getElementById(id);if(cv&&cv.dataset.signed)data.sig[id]=sigDataURL(id);});
   return data;
 }
 function saveState(){
@@ -547,7 +558,7 @@ function buildPdfHTML(){
   if(comm||res){h+=`<h2>Observations & réserves</h2><table><tr><th style="width:50%">Commentaires</th><th>Réserves</th></tr><tr><td>${comm.replace(/\n/g,'<br>')}</td><td>${res.replace(/\n/g,'<br>')}</td></tr></table>`;}
 
   const sp=document.getElementById('sigProp'), sl=document.getElementById('sigLoc');
-  const spImg=sp.dataset.signed?sp.toDataURL():'', slImg=sl.dataset.signed?sl.toDataURL():'';
+  const spImg=sigDataURL('sigProp'), slImg=sigDataURL('sigLoc');
   h+=`<div class="legal">Les soussignés reconnaissent exactes les constatations sur l'état du logement, sous réserve du bon fonctionnement des canalisations, appareils et installations sanitaires, électriques et de chauffage qui n'a pu être vérifié ce jour ; toute défectuosité devant être signalée dans un délai de dix jours (et pendant le premier mois de chauffe pour le chauffage). Le présent état des lieux, établi contradictoirement, fait partie intégrante du contrat de location.</div>`;
   h+=`<div style="margin-top:8px;font-size:10px">Fait à Castelnau-le-Lez, le ${dateTxt}</div>`;
   h+=`<div class="sigblk">
@@ -623,13 +634,13 @@ function printDoc(){
   },500);
 }
 
-/* ---------- COPIE DE SECOURS (fichier .edlbak téléchargeable / restaurable) ---------- */
+/* ---------- COPIE DE SECOURS (fichier .json téléchargeable / restaurable) ---------- */
 function sauvegardeSecours(){
   saveState();
   try{
     const data=collectState();
     const dateTxt=(document.getElementById('f_date').value||new Date().toISOString().slice(0,10));
-    const nom=`Sauvegarde_EDL_${mode}_${dateTxt}.edlbak`;
+    const nom=`Sauvegarde_EDL_${mode}_${dateTxt}.json`;
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const file=new File([blob],nom,{type:'application/json'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -650,6 +661,7 @@ function restaurerSecours(input){
   r.onload=e=>{
     try{
       const d=JSON.parse(e.target.result);
+      if(!d || typeof d!=='object' || !d.fields || !d.selects){throw new Error('bad backup');}
       applyState(d);
       saveState();
       toast('Sauvegarde restaurée ✓');
