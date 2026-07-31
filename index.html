@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="État des lieux">
+<title>État des lieux</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  :root{
+    --bleu:#1d4e89; --bleu-clair:#e8f0fb; --vert:#2e7d5b; --gris:#f4f5f7;
+    --bord:#d9dde3; --txt:#1f2733; --rouge:#c0392b; --ombre:0 2px 8px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--gris);color:var(--txt);font-size:16px;line-height:1.4;padding-bottom:160px;}
+  header{position:sticky;top:0;z-index:50;background:var(--bleu);color:#fff;
+    padding:12px 16px;box-shadow:var(--ombre);}
+  header h1{margin:0;font-size:18px;font-weight:600;}
+  header p{margin:2px 0 0;font-size:12px;opacity:.85;}
+  .mode{display:flex;gap:8px;margin-top:10px;}
+  .mode button{flex:1;padding:9px;border:0;border-radius:10px;font-size:14px;font-weight:600;
+    background:rgba(255,255,255,.18);color:#fff;}
+  .mode button.on{background:#fff;color:var(--bleu);}
+  main{padding:14px;max-width:760px;margin:0 auto;}
+  .card{background:#fff;border-radius:14px;box-shadow:var(--ombre);margin-bottom:14px;overflow:hidden;}
+  .card>h2{margin:0;background:var(--bleu-clair);color:var(--bleu);font-size:15px;
+    padding:12px 14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+  .card>h2 .chev{transition:transform .2s;font-size:13px;}
+  .card.closed>h2 .chev{transform:rotate(-90deg);}
+  .card.closed .body{display:none;}
+  .body{padding:12px 14px;}
+  .subttl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+    color:#8894a5;margin:14px 0 6px;}
+  .subttl:first-child{margin-top:0;}
+  label{display:block;font-size:12px;color:#6a7686;margin:8px 0 3px;font-weight:600;}
+  input[type=text],input[type=date],input[type=email],select,textarea{width:100%;padding:10px;border:1px solid var(--bord);
+    border-radius:9px;font-size:15px;font-family:inherit;background:#fff;color:var(--txt);}
+  textarea{resize:vertical;min-height:44px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .item{border:1px solid var(--bord);border-radius:12px;padding:11px;margin-bottom:11px;background:#fdfdfe;}
+  .item .nom{font-weight:700;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+  .item .nom .q{font-size:11px;background:var(--bleu-clair);color:var(--bleu);
+    padding:1px 7px;border-radius:20px;font-weight:700;}
+  .row-etats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .photo-zone{margin-top:8px;}
+  .photo-btn{display:inline-flex;align-items:center;gap:6px;background:var(--bleu-clair);
+    color:var(--bleu);border:1px dashed var(--bleu);border-radius:9px;padding:8px 12px;font-size:13px;
+    font-weight:600;cursor:pointer;}
+  .photo-btn input{display:none;}
+  .thumbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--bord);}
+  .thumb img{width:100%;height:100%;object-fit:cover;}
+  .thumb .x{position:absolute;top:1px;right:1px;background:var(--rouge);color:#fff;
+    width:18px;height:18px;border-radius:50%;font-size:12px;line-height:18px;text-align:center;cursor:pointer;}
+  .addItem{width:100%;padding:9px;border:1px dashed var(--bleu);background:#fff;color:var(--bleu);
+    border-radius:9px;font-weight:600;font-size:13px;cursor:pointer;margin-top:2px;}
+  .sig-wrap{border:1px solid var(--bord);border-radius:10px;background:#fff;position:relative;}
+  .sig-wrap canvas{width:100%;height:150px;display:block;border-radius:10px;touch-action:none;}
+  .sig-clear{position:absolute;top:6px;right:8px;font-size:12px;color:var(--rouge);
+    background:#fff;border:1px solid var(--bord);border-radius:6px;padding:3px 8px;cursor:pointer;}
+  .sig-lbl{font-size:12px;color:#8894a5;text-align:center;padding-top:4px;}
+  footer{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--bord);
+    padding:10px 14px;display:flex;gap:8px;z-index:60;box-shadow:0 -2px 10px rgba(0,0,0,.06);flex-wrap:wrap;}
+  .btn{flex:1;padding:12px;border:0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;}
+  .btn-main{background:var(--vert);color:#fff;min-width:140px;}
+  .btn-html{background:#6f42c1;color:#fff;min-width:135px;}
+  .btn-mail{background:var(--bleu);color:#fff;min-width:135px;}
+  .btn-sec{background:var(--bleu-clair);color:var(--bleu);max-width:54px;font-size:20px;}
+  .hint{font-size:12px;color:#8894a5;background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:14px;border:1px solid var(--bord);}
+  .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;
+    padding:11px 18px;border-radius:24px;font-size:14px;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center;}
+  .toast.show{opacity:1;}
+  /* zone PDF cachée */
+  #pdf{position:fixed;left:-9999px;top:0;width:794px;background:#fff;color:#000;font-size:12px;padding:28px;}
+  #pdf h1{font-size:18px;text-align:center;color:#1d4e89;margin:0 0 2px;}
+  #pdf .sub{text-align:center;font-size:11px;color:#555;margin-bottom:12px;}
+  #pdf table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+  #pdf th,#pdf td{border:1px solid #999;padding:4px 5px;font-size:10.5px;vertical-align:top;text-align:left;}
+  #pdf th{background:#e8f0fb;color:#1d4e89;}
+  #pdf h2{background:#1d4e89;color:#fff;font-size:13px;padding:5px 8px;margin:14px 0 6px;border-radius:3px;}
+  #pdf h3{font-size:11px;color:#1d4e89;margin:8px 0 3px;text-transform:uppercase;}
+  #pdf .info td:nth-child(odd){background:#f4f5f7;font-weight:bold;width:22%;}
+  #pdf .pimgs{display:flex;flex-wrap:wrap;gap:3px;}
+  #pdf .pimgs img{width:70px;height:70px;object-fit:cover;border:1px solid #999;border-radius:2px;}
+  #pdf .sigblk{display:flex;gap:20px;margin-top:16px;}
+  #pdf .sigblk>div{flex:1;text-align:center;}
+  #pdf .sigblk img{max-width:100%;height:90px;object-fit:contain;border-bottom:1px solid #000;}
+  #pdf .legal{font-size:9px;color:#444;margin-top:14px;text-align:justify;line-height:1.35;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>État des lieux — Studio Castelnau</h1>
+  <p>256 route de Nîmes · Réf. Nauvia · Lot 102</p>
+  <div class="mode">
+    <button id="mEntree" class="on" onclick="setMode('entree')">🟢 Entrée</button>
+    <button id="mSortie" onclick="setMode('sortie')">🔴 Sortie</button>
+  </div>
+</header>
+
+<main>
+  <div class="hint">📱 Astuce : appuyez sur <b>Partager → Sur l'écran d'accueil</b> pour installer cet outil comme une app. Vos saisies restent enregistrées automatiquement sur ce téléphone.</div>
+
+  <!-- ENTETE -->
+  <div class="card">
+    <h2 onclick="toggle(this)">Informations générales <span class="chev">▾</span></h2>
+    <div class="body">
+      <div class="grid2">
+        <div><label>Date de l'état des lieux</label><input type="date" id="f_date"></div>
+        <div><label>Type</label><input type="text" id="f_type" value="Appartement"></div>
+      </div>
+      <label>Adresse du bien</label>
+      <input type="text" id="f_adresse" value="256 route de Nîmes, 34170 Castelnau-le-Lez">
+      <div class="grid2">
+        <div><label>Étage</label><input type="text" id="f_etage" value="1"></div>
+        <div><label>Surface</label><input type="text" id="f_surface" value="24 m²"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Nb de pièces</label><input type="text" id="f_pieces" value="1"></div>
+        <div><label>Lot / Réf.</label><input type="text" id="f_lot" value="102 / Nauvia"></div>
+      </div>
+      <label>Chauffage</label><input type="text" id="f_chauf" value="Individuel électrique">
+      <label>Eau chaude</label><input type="text" id="f_eau" value="Collective">
+      <div class="subttl">Propriétaire</div>
+      <input type="text" id="f_prop" value="Gabriele Armilli — 14 rue du Marigny, 34750 Villeneuve-lès-Maguelone">
+      <div class="subttl">Locataire</div>
+      <input type="text" id="f_loc" placeholder="Nom, prénom et adresse du locataire">
+    </div>
+  </div>
+
+  <!-- EMAILS -->
+  <div class="card">
+    <h2 onclick="toggle(this)">Emails d'envoi <span class="chev">▾</span></h2>
+    <div class="body">
+      <div class="grid2">
+        <div><label>Email propriétaire</label><input type="email" id="f_mail_prop" placeholder="proprietaire@email.fr"></div>
+        <div><label>Email locataire</label><input type="email" id="f_mail_loc" placeholder="locataire@email.fr"></div>
+      </div>
+      <label>Email complémentaire / copie</label>
+      <input type="email" id="f_mail_cc" placeholder="optionnel">
+      <div class="hint" style="margin-top:10px;margin-bottom:0;">📧 « Préparer mail » ouvre Mail avec les destinataires. « Export HTML » crée un fichier autonome partageable par WhatsApp, Mail ou AirDrop.</div>
+    </div>
+  </div>
+
+  <div id="pieces"></div>
+
+  <!-- COMPTEURS -->
+  <div class="card">
+    <h2 onclick="toggle(this)">Compteurs <span class="chev">▾</span></h2>
+    <div class="body" id="compteurs"></div>
+  </div>
+
+  <!-- CLES -->
+  <div class="card">
+    <h2 onclick="toggle(this)">Clés & accès <span class="chev">▾</span></h2>
+    <div class="body" id="cles"></div>
+  </div>
+
+  <!-- OBSERVATIONS -->
+  <div class="card">
+    <h2 onclick="toggle(this)">Observations & réserves <span class="chev">▾</span></h2>
+    <div class="body">
+      <label>Commentaires généraux</label>
+      <textarea id="f_comm" rows="3"></textarea>
+      <label>Réserves</label>
+      <textarea id="f_reserve" rows="2"></textarea>
+    </div>
+  </div>
+
+  <!-- SIGNATURES -->
+  <div class="card">
+    <h2 onclick="toggle(this)">Signatures <span class="chev">▾</span></h2>
+    <div class="body">
+      <label>Signature du propriétaire</label>
+      <div class="sig-wrap"><span class="sig-clear" onclick="clearSig('sigProp')">Effacer</span>
+        <canvas id="sigProp"></canvas><div class="sig-lbl">Signez avec le doigt</div></div>
+      <label style="margin-top:14px;">Signature du locataire</label>
+      <div class="sig-wrap"><span class="sig-clear" onclick="clearSig('sigLoc')">Effacer</span>
+        <canvas id="sigLoc"></canvas><div class="sig-lbl">Signez avec le doigt</div></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <button class="btn btn-sec" onclick="resetAll()" title="Nouvel état des lieux">🗑️</button>
+  <button class="btn btn-sec" onclick="printDoc()" title="Imprimer / enregistrer PDF">🖨️</button>
+  <button class="btn btn-main" onclick="genererPDF()">📄 Générer PDF</button>
+  <button class="btn btn-html" onclick="exporterHTML()">📝 Export HTML</button>
+  <button class="btn btn-mail" onclick="preparerMail()">📧 Préparer mail</button>
+</footer>
+
+<div id="pdf"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- MODÈLE DE DONNÉES (pré-rempli depuis votre studio) ---------- */
+const ETATS = ["", "Neuf", "Très bon état", "Bon état", "État d'usage", "Mauvais état", "Absent / HS"];
+const TEMPLATE = [
+ {piece:"Cuisine", groupes:[
+   {titre:"Décoration", items:[
+     {n:"Crédence", nat:"", e:"Très bon état"},
+     {n:"Sol", nat:"Carrelage", e:"Très bon état", c:"1 carreau abîmé"},
+     {n:"Plinthe", nat:"Carrelage", e:"Très bon état"},
+     {n:"Mur", nat:"Peinture blanche", e:"Neuf", c:"Petit manque de peinture au-dessus de la porte SdB"},
+     {n:"Plafond", nat:"Peinture blanche", e:"Très bon état"},
+   ]},
+   {titre:"Électricité & chauffage", items:[
+     {n:"Prise électrique", q:"7", e:"Très bon état"},
+     {n:"Néon", q:"1", e:"Très bon état"},
+     {n:"Douille + ampoule", q:"1", e:"Très bon état"},
+     {n:"Interrupteur VMC", q:"1", e:"Très bon état"},
+     {n:"VMC", q:"1", e:"Très bon état"},
+   ]},
+   {titre:"Équipement", items:[
+     {n:"Hotte", nat:"Inoval", e:"Très bon état", c:"Filtre neuf"},
+     {n:"Frigo Top", e:"Très bon état"},
+     {n:"Plaque de cuisson", e:"Neuf"},
+     {n:"Meuble sous évier", q:"1", e:"Très bon état"},
+     {n:"Mitigeur évier", q:"1", e:"Très bon état"},
+     {n:"Siphon", q:"1", e:"Très bon état"},
+     {n:"Plan de travail", e:"Très bon état"},
+     {n:"Joints", e:"Neuf"},
+     {n:"Arrivée + sortie d'eau", q:"1", e:"Très bon état"},
+     {n:"Bac évier", q:"1", e:"Bon état", c:"Rayures"},
+     {n:"Meuble emplacement micro-ondes", q:"1", e:"Très bon état"},
+     {n:"Meuble haut 1 porte 1 tablette", q:"3", e:"Très bon état"},
+   ]},
+ ]},
+ {piece:"Séjour / Salon", groupes:[
+   {titre:"Décoration", items:[
+     {n:"Fenêtre", nat:"Double vitrage PVC", e:"Très bon état"},
+     {n:"Porte (avec judas)", e:"Très bon état"},
+     {n:"Sol", nat:"Carrelage", e:"Très bon état", c:"1 carreau abîmé"},
+     {n:"Plinthe", nat:"Carrelage", e:"Très bon état"},
+     {n:"Mur", nat:"Peinture blanche", e:"Neuf"},
+     {n:"Plafond", nat:"Peinture blanche", e:"Très bon état"},
+   ]},
+   {titre:"Électricité & chauffage", items:[
+     {n:"Prise électrique", q:"7", e:"Très bon état"},
+     {n:"Douille + ampoule", q:"2", e:"Très bon état"},
+     {n:"Climatiseur mural Atlantic", q:"1", e:"Neuf", c:"Notice fournie"},
+     {n:"Télécommande climatiseur", q:"1", e:"Neuf"},
+     {n:"Coffrage volet roulant", q:"1", e:"Très bon état"},
+     {n:"Interrupteur volet roulant", q:"1", e:"Très bon état"},
+     {n:"Volet roulant électrique", q:"1", e:"Très bon état"},
+     {n:"Interrupteurs", q:"2", e:"Très bon état"},
+     {n:"Interrupteur lumière extérieure", q:"1", e:"Très bon état"},
+     {n:"DAAF (détecteur fumée)", q:"1", e:"Très bon état"},
+   ]},
+ ]},
+ {piece:"Salle de bains", groupes:[
+   {titre:"Décoration", items:[
+     {n:"Porte", e:"Très bon état"},
+     {n:"Sol", nat:"Carrelage", e:"Très bon état"},
+     {n:"Plinthe", nat:"Carrelage", e:"Très bon état"},
+     {n:"Mur", nat:"Peinture blanche", e:"Bon état", c:"Manque de peinture à côté de la porte"},
+     {n:"Plafond", nat:"Peinture blanche", e:"Très bon état"},
+   ]},
+   {titre:"Électricité & chauffage", items:[
+     {n:"Prise électrique", e:"Très bon état"},
+     {n:"Douille + ampoule", q:"1", e:"Très bon état"},
+     {n:"Sèche-serviette électrique", q:"1", e:"Très bon état", c:"Manque caches"},
+     {n:"Interrupteur", e:"Très bon état"},
+   ]},
+   {titre:"Équipement", items:[
+     {n:"WC", e:"Très bon état"},
+     {n:"Abattant", e:"Très bon état"},
+     {n:"Cuvette", e:"Très bon état"},
+     {n:"Chasse d'eau", e:"Très bon état"},
+     {n:"Barre de douche", e:"Très bon état"},
+     {n:"Crédence douche", e:"Très bon état"},
+     {n:"Flexible", e:"Très bon état"},
+     {n:"Mitigeur douche", e:"Très bon état"},
+     {n:"Joints douche", e:"Neuf"},
+     {n:"Plan de vasque", e:"Très bon état", c:"Carreaux stickers neufs"},
+     {n:"Lavabo", e:"Très bon état"},
+     {n:"Bonde lavabo", e:"Très bon état"},
+     {n:"Joints lavabo", e:"Très bon état"},
+     {n:"Meuble sous vasque", e:"Très bon état", c:"Tache sur porte"},
+     {n:"Siphon lavabo", e:"Très bon état"},
+     {n:"Miroir avec applique lumineuse", e:"Très bon état"},
+     {n:"VMC", e:"Très bon état"},
+   ]},
+ ]},
+ {piece:"Balcon", groupes:[
+   {titre:"", items:[
+     {n:"Sol", nat:"Dalles sur plots", e:"Très bon état", c:"Présence de taches"},
+     {n:"Applique", e:"Très bon état"},
+     {n:"Unité extérieure climatiseur", e:"Neuf"},
+     {n:"Mur", nat:"Crépi", e:"Très bon état"},
+     {n:"Plafond", nat:"Peinture blanche", e:"Très bon état"},
+     {n:"Garde-corps", e:"Très bon état"},
+   ]},
+ ]},
+ {piece:"Parking", groupes:[
+   {titre:"", items:[
+     {n:"Sol", nat:"Brut", e:"Brut"},
+     {n:"Mur", nat:"Brut", e:"Brut"},
+   ]},
+ ]},
+ {piece:"Boîte aux lettres", groupes:[
+   {titre:"", items:[
+     {n:"Porte", e:"Très bon état"},
+     {n:"Serrure", e:"Très bon état"},
+   ]},
+ ]},
+];
+const COMPTEURS = [
+  {t:"Eau froide", num:"183698", idx:"00109862"},
+  {t:"Électrique heure pleine", num:"24389435409556", idx:"10952"},
+];
+const CLES = [
+  {t:"Badge vigik", nb:"1", c:"N° 0021282792"},
+  {t:"Bip parking", nb:"1", c:""},
+  {t:"Clé boîtes aux lettres", nb:"2", c:""},
+  {t:"Clé logement", nb:"2", c:""},
+];
+
+/* ---------- ÉTAT ---------- */
+let mode = "entree";
+const store = { photos:{} }; // photos[itemId] = [dataURL,...]
+const KEY = "edl_studio_v1";
+
+/* ---------- RENDU ---------- */
+function esc(s){return (s||"").replace(/"/g,'&quot;');}
+function optEtats(sel){return ETATS.map(e=>`<option ${e===sel?'selected':''}>${e||'— choisir —'}</option>`).join('');}
+
+function renderPieces(){
+  let html="";
+  TEMPLATE.forEach((p,pi)=>{
+    html+=`<div class="card"><h2 onclick="toggle(this)">${p.piece} <span class="chev">▾</span></h2><div class="body">`;
+    p.groupes.forEach((g,gi)=>{
+      if(g.titre) html+=`<div class="subttl">${g.titre}</div>`;
+      g.items.forEach((it,ii)=>{
+        const id=`p${pi}_g${gi}_i${ii}`;
+        html+=itemHTML(id,it);
+      });
+      html+=`<button class="addItem" onclick="addItem(${pi},${gi})">＋ Ajouter un élément</button>`;
+    });
+    html+=`</div></div>`;
+  });
+  document.getElementById('pieces').innerHTML=html;
+
+  // compteurs
+  let c="";
+  COMPTEURS.forEach((m,i)=>{
+    c+=`<div class="item"><div class="nom">${m.t}</div>
+      <div class="grid2">
+        <div><label>N° compteur</label><input type="text" id="cpt${i}_num" value="${esc(m.num)}"></div>
+        <div><label>Index relevé</label><input type="text" id="cpt${i}_idx" value="${esc(m.idx)}"></div>
+      </div></div>`;
+  });
+  document.getElementById('compteurs').innerHTML=c;
+
+  // clés
+  let k="";
+  CLES.forEach((m,i)=>{
+    k+=`<div class="item"><div class="nom">${m.t}</div>
+      <div class="grid2">
+        <div><label>Nombre remis</label><input type="text" id="cle${i}_nb" value="${esc(m.nb)}"></div>
+        <div><label>Commentaire</label><input type="text" id="cle${i}_c" value="${esc(m.c)}"></div>
+      </div></div>`;
+  });
+  document.getElementById('cles').innerHTML=k;
+}
+
+function itemHTML(id,it){
+  const q = it.q? `<span class="q">×${it.q}</span>`:'';
+  const nat = it.nat!==undefined ? `<label>Nature / marque</label><input type="text" id="${id}_nat" value="${esc(it.nat)}">`:'';
+  return `<div class="item" id="box_${id}">
+    <div class="nom">${it.n} ${q}</div>
+    ${nat}
+    <div class="row-etats">
+      <div><label>État entrée</label><select id="${id}_ee">${optEtats(it.e||'')}</select></div>
+      <div><label>État sortie</label><select id="${id}_es">${optEtats('')}</select></div>
+    </div>
+    <label>Commentaire</label>
+    <textarea id="${id}_c" rows="1">${esc(it.c||'')}</textarea>
+    <div class="photo-zone">
+      <label class="photo-btn">📷 Photo
+        <input type="file" accept="image/*" capture="environment" multiple onchange="addPhoto('${id}',this)">
+      </label>
+      <div class="thumbs" id="th_${id}"></div>
+    </div>
+  </div>`;
+}
+
+let extraCount=0;
+function addItem(pi,gi){
+  const id=`x${extraCount++}`;
+  const g=document.querySelectorAll('#pieces .card')[pi].querySelectorAll('.addItem')[gi];
+  const div=document.createElement('div');
+  div.innerHTML=itemHTML(id,{n:"Nouvel élément",nat:"",e:""});
+  // rendre le nom éditable
+  const box=div.firstElementChild;
+  const nom=box.querySelector('.nom');
+  nom.innerHTML=`<input type="text" id="${id}_nom" value="Nouvel élément" style="font-weight:700;">`;
+  g.parentNode.insertBefore(box,g);
+  saveState();
+}
+
+/* ---------- PHOTOS ---------- */
+function addPhoto(id,input){
+  const files=[...input.files];
+  if(!store.photos[id]) store.photos[id]=[];
+  let done=0;
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=e=>{
+      compress(e.target.result, d=>{
+        store.photos[id].push(d);
+        done++;
+        if(done===files.length){renderThumbs(id);saveState();}
+      });
+    };
+    r.readAsDataURL(f);
+  });
+  input.value="";
+}
+function compress(dataUrl,cb){
+  const img=new Image();
+  img.onload=()=>{
+    const max=1000; let{width:w,height:h}=img;
+    if(w>h && w>max){h=h*max/w;w=max;} else if(h>max){w=w*max/h;h=max;}
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    cv.getContext('2d').drawImage(img,0,0,w,h);
+    cb(cv.toDataURL('image/jpeg',0.7));
+  };
+  img.src=dataUrl;
+}
+function renderThumbs(id){
+  const box=document.getElementById('th_'+id);
+  if(!box)return;
+  box.innerHTML=(store.photos[id]||[]).map((d,i)=>
+    `<div class="thumb"><img src="${d}"><div class="x" onclick="delPhoto('${id}',${i})">×</div></div>`).join('');
+}
+function delPhoto(id,i){store.photos[id].splice(i,1);renderThumbs(id);saveState();}
+
+/* ---------- SIGNATURES ---------- */
+function initSig(cid){
+  const cv=document.getElementById(cid);
+  const dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  cv.width=rect.width*dpr; cv.height=rect.height*dpr;
+  const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr);
+  ctx.lineWidth=2.2;ctx.lineCap='round';ctx.strokeStyle='#0b2545';
+  let draw=false,px,py;
+  const pos=e=>{const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return[t.clientX-r.left,t.clientY-r.top];};
+  const start=e=>{e.preventDefault();draw=true;[px,py]=pos(e);};
+  const move=e=>{if(!draw)return;e.preventDefault();const[x,y]=pos(e);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();[px,py]=[x,y];cv.dataset.signed="1";};
+  const end=()=>{draw=false;saveState();};
+  cv.addEventListener('touchstart',start);cv.addEventListener('touchmove',move);cv.addEventListener('touchend',end);
+  cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);cv.addEventListener('mouseup',end);
+}
+function clearSig(cid){const cv=document.getElementById(cid);cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv.dataset.signed="";saveState();}
+
+/* ---------- MODE ---------- */
+function setMode(m){
+  mode=m;
+  document.getElementById('mEntree').classList.toggle('on',m==='entree');
+  document.getElementById('mSortie').classList.toggle('on',m==='sortie');
+  saveState();
+}
+function toggle(h){h.parentNode.classList.toggle('closed');}
+
+/* ---------- SAUVEGARDE LOCALE ---------- */
+function saveState(){
+  try{
+    const data={mode,fields:{},selects:{},photos:store.photos,sig:{}};
+    document.querySelectorAll('input[type=text],input[type=date],input[type=email],textarea').forEach(el=>{if(el.id)data.fields[el.id]=el.value;});
+    document.querySelectorAll('select').forEach(el=>{if(el.id)data.selects[el.id]=el.value;});
+    ['sigProp','sigLoc'].forEach(id=>{const cv=document.getElementById(id);if(cv&&cv.dataset.signed)data.sig[id]=cv.toDataURL();});
+    localStorage.setItem(KEY,JSON.stringify(data));
+  }catch(e){}
+}
+function loadState(){
+  try{
+    const d=JSON.parse(localStorage.getItem(KEY)||"{}");
+    if(d.mode)setMode(d.mode);
+    if(d.fields)for(const k in d.fields){const el=document.getElementById(k);if(el)el.value=d.fields[k];}
+    if(d.selects)for(const k in d.selects){const el=document.getElementById(k);if(el)el.value=d.selects[k];}
+    if(d.photos){store.photos=d.photos;for(const id in store.photos)renderThumbs(id);}
+    if(d.sig)for(const id in d.sig){const cv=document.getElementById(id);const img=new Image();img.onload=()=>{const r=cv.getBoundingClientRect();cv.getContext('2d').drawImage(img,0,0,r.width,r.height);};img.src=d.sig[id];cv.dataset.signed="1";}
+  }catch(e){}
+}
+document.addEventListener('input',()=>{clearTimeout(window._sv);window._sv=setTimeout(saveState,400);});
+
+function resetAll(){
+  if(!confirm("Démarrer un nouvel état des lieux vierge ? Les données actuelles seront effacées."))return;
+  localStorage.removeItem(KEY);location.reload();
+}
+
+/* ---------- GÉNÉRATION PDF ---------- */
+function buildPdfHTML(){
+  const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
+  const dateTxt=g('f_date')||new Date().toLocaleDateString('fr-FR');
+  let h=`<h1>ÉTAT DES LIEUX — ${mode==='entree'?"ENTRÉE":"SORTIE"}</h1>
+    <div class="sub">Établi contradictoirement le ${dateTxt}</div>
+    <table class="info">
+      <tr><td>Bien</td><td>${g('f_type')}</td><td>Adresse</td><td>${g('f_adresse')}</td></tr>
+      <tr><td>Étage</td><td>${g('f_etage')}</td><td>Surface</td><td>${g('f_surface')}</td></tr>
+      <tr><td>Pièces</td><td>${g('f_pieces')}</td><td>Lot / Réf.</td><td>${g('f_lot')}</td></tr>
+      <tr><td>Chauffage</td><td>${g('f_chauf')}</td><td>Eau chaude</td><td>${g('f_eau')}</td></tr>
+      <tr><td>Propriétaire</td><td colspan="3">${g('f_prop')}</td></tr>
+      <tr><td>Locataire</td><td colspan="3">${g('f_loc')||'—'}</td></tr>
+      <tr><td>Email propriétaire</td><td>${g('f_mail_prop')||'—'}</td><td>Email locataire</td><td>${g('f_mail_loc')||'—'}</td></tr>
+    </table>`;
+
+  document.querySelectorAll('#pieces .card').forEach(card=>{
+    const titre=card.querySelector('h2').childNodes[0].textContent.trim();
+    h+=`<h2>${titre}</h2>`;
+    // grouper par subttl
+    let rows="";
+    card.querySelectorAll('.item').forEach(item=>{
+      const id=item.id.replace('box_','');
+      const nomEl=item.querySelector('.nom');
+      let nom = nomEl.querySelector('input')? nomEl.querySelector('input').value : nomEl.childNodes[0].textContent.trim();
+      const qEl=nomEl.querySelector('.q'); const q=qEl?qEl.textContent.replace('×',''):'';
+      const nat=(document.getElementById(id+'_nat')||{}).value||'';
+      const ee=(document.getElementById(id+'_ee')||{}).value||'';
+      const es=(document.getElementById(id+'_es')||{}).value||'';
+      const c=(document.getElementById(id+'_c')||{}).value||'';
+      const ph=(store.photos[id]||[]).map(d=>`<img src="${d}">`).join('');
+      rows+=`<tr><td>${nom}${q?' ×'+q:''}${nat?'<br><i style="color:#666">'+nat+'</i>':''}</td>
+        <td>${ee}</td><td>${es}</td><td>${c}</td>
+        <td><div class="pimgs">${ph}</div></td></tr>`;
+    });
+    h+=`<table><tr><th style="width:26%">Élément</th><th style="width:15%">Entrée</th><th style="width:15%">Sortie</th><th style="width:24%">Commentaire</th><th>Photos</th></tr>${rows}</table>`;
+  });
+
+  // compteurs
+  let cr="";
+  COMPTEURS.forEach((m,i)=>{cr+=`<tr><td>${m.t}</td><td>${g('cpt'+i+'_num')}</td><td>${g('cpt'+i+'_idx')}</td></tr>`;});
+  h+=`<h2>Compteurs</h2><table><tr><th>Type</th><th>N° compteur</th><th>Index</th></tr>${cr}</table>`;
+  // clés
+  let kr="";
+  CLES.forEach((m,i)=>{kr+=`<tr><td>${m.t}</td><td>${g('cle'+i+'_nb')}</td><td>${g('cle'+i+'_c')}</td></tr>`;});
+  h+=`<h2>Clés & accès</h2><table><tr><th>Type</th><th>Nombre</th><th>Commentaire</th></tr>${kr}</table>`;
+
+  const comm=g('f_comm'), res=g('f_reserve');
+  if(comm||res){h+=`<h2>Observations & réserves</h2><table><tr><th style="width:50%">Commentaires</th><th>Réserves</th></tr><tr><td>${comm.replace(/\n/g,'<br>')}</td><td>${res.replace(/\n/g,'<br>')}</td></tr></table>`;}
+
+  // légal + signatures
+  const sp=document.getElementById('sigProp'), sl=document.getElementById('sigLoc');
+  const spImg=sp.dataset.signed?sp.toDataURL():'', slImg=sl.dataset.signed?sl.toDataURL():'';
+  h+=`<div class="legal">Les soussignés reconnaissent exactes les constatations sur l'état du logement, sous réserve du bon fonctionnement des canalisations, appareils et installations sanitaires, électriques et de chauffage qui n'a pu être vérifié ce jour ; toute défectuosité devant être signalée dans un délai de dix jours (et pendant le premier mois de chauffe pour le chauffage). Le présent état des lieux, établi contradictoirement, fait partie intégrante du contrat de location.</div>`;
+  h+=`<div style="margin-top:8px;font-size:10px">Fait à Castelnau-le-Lez, le ${dateTxt}</div>`;
+  h+=`<div class="sigblk">
+      <div><div style="font-size:10px;margin-bottom:2px">Le propriétaire</div>${spImg?`<img src="${spImg}">`:'<div style="height:90px;border-bottom:1px solid #000"></div>'}</div>
+      <div><div style="font-size:10px;margin-bottom:2px">Le locataire</div>${slImg?`<img src="${slImg}">`:'<div style="height:90px;border-bottom:1px solid #000"></div>'}</div>
+    </div>`;
+  return h;
+}
+
+async function genererPDF(){
+  saveState();
+  toast("Génération du PDF…");
+  document.getElementById('pdf').innerHTML=buildPdfHTML();
+  const el=document.getElementById('pdf');
+  const nom=`EDL_${mode}_${(document.getElementById('f_date').value||new Date().toISOString().slice(0,10))}.pdf`;
+  window.lastPdfName = nom;
+  const opt={margin:[8,8,10,8],filename:nom,image:{type:'jpeg',quality:0.85},
+    html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+    pagebreak:{mode:['css','legacy']}};
+  try{
+    await html2pdf().set(opt).from(el).save();
+    toast("PDF généré et enregistré ✓");
+  }catch(e){
+    console.error(e);
+    toast("PDF non généré : utilisez le bouton imprimer");
+    printDoc();
+  }
+}
+
+function genererEtEnvoyer(){
+  genererPDF();
+}
+
+function buildStandaloneHTML(){
+  saveState();
+  const contenu=buildPdfHTML();
+  const dateTxt=(document.getElementById('f_date').value||new Date().toISOString().slice(0,10));
+  const typeTxt=mode==='entree'?'ENTRÉE':'SORTIE';
+  const titre=`État des lieux ${typeTxt} - Studio Castelnau - ${dateTxt}`;
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${titre}</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;background:#f4f5f7;color:#1f2733;}
+  .wrap{max-width:920px;margin:0 auto;background:#fff;padding:22px;}
+  h1{font-size:24px;text-align:center;color:#1d4e89;margin:0 0 4px;}
+  .sub{text-align:center;font-size:13px;color:#555;margin-bottom:16px;}
+  h2{background:#1d4e89;color:#fff;font-size:16px;padding:8px 10px;margin:18px 0 8px;border-radius:6px;}
+  h3{font-size:13px;color:#1d4e89;margin:10px 0 4px;text-transform:uppercase;}
+  table{width:100%;border-collapse:collapse;margin-bottom:10px;background:#fff;}
+  th,td{border:1px solid #999;padding:6px 7px;font-size:12px;vertical-align:top;text-align:left;}
+  th{background:#e8f0fb;color:#1d4e89;}
+  .info td:nth-child(odd){background:#f4f5f7;font-weight:bold;width:22%;}
+  .pimgs{display:flex;flex-wrap:wrap;gap:6px;}
+  .pimgs img{width:120px;height:120px;object-fit:cover;border:1px solid #999;border-radius:4px;}
+  .sigblk{display:flex;gap:20px;margin-top:18px;}
+  .sigblk>div{flex:1;text-align:center;}
+  .sigblk img{max-width:100%;height:110px;object-fit:contain;border-bottom:1px solid #000;}
+  .legal{font-size:11px;color:#444;margin-top:16px;text-align:justify;line-height:1.4;}
+  .notice{font-size:11px;color:#6a7686;text-align:center;margin:12px 0 0;}
+  @media(max-width:700px){.wrap{padding:12px;} th,td{font-size:11px;padding:5px;} .pimgs img{width:88px;height:88px;} .sigblk{display:block}.sigblk>div{margin-bottom:16px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+${contenu}
+<div class="notice">Document HTML autonome généré depuis l'outil Etat des lieux. Les photos et signatures sont intégrées dans ce fichier.</div>
+</div>
+</body>
+</html>`;
+}
+
+function exporterHTML(){
+  try{
+    const dateTxt=(document.getElementById('f_date').value||new Date().toISOString().slice(0,10));
+    const nom=`EDL_${mode}_${dateTxt}.html`;
+    const html=buildStandaloneHTML();
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    window.lastHtmlName=nom;
+    const file=new File([blob],nom,{type:'text/html'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:'État des lieux',text:'État des lieux du studio'}).then(()=>toast('HTML prêt à partager ✓')).catch(()=>telechargerHTML(blob,nom));
+    }else{
+      telechargerHTML(blob,nom);
+    }
+  }catch(e){
+    console.error(e);
+    toast('Export HTML impossible');
+  }
+}
+
+function telechargerHTML(blob,nom){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=nom;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  toast('HTML exporté ✓');
+}
+
+function preparerMail(){
+  saveState();
+  const g=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
+  const destinataires=[g('f_mail_prop'),g('f_mail_loc')].filter(Boolean).map(encodeURIComponent).join(',');
+  const cc=g('f_mail_cc');
+  const dateTxt=g('f_date')||new Date().toISOString().slice(0,10);
+  const typeTxt=mode==='entree'?'entrée':'sortie';
+  const sujet=encodeURIComponent(`Etat des lieux ${typeTxt} - Studio Castelnau - ${dateTxt}`);
+  const nomPdf=window.lastPdfName || `EDL_${mode}_${dateTxt}.pdf`;
+  const nomHtml=window.lastHtmlName || `EDL_${mode}_${dateTxt}.html`;
+  const corps=encodeURIComponent(
+`Bonjour,
+
+Veuillez trouver ci-joint l'état des lieux ${typeTxt} du studio situé 256 route de Nîmes, 34170 Castelnau-le-Lez.
+
+Fichier HTML à joindre ou partager : ${nomHtml}
+Fichier PDF possible : ${nomPdf}
+
+Cordialement.`);
+  let url=`mailto:${destinataires}?subject=${sujet}&body=${corps}`;
+  if(cc) url += `&cc=${encodeURIComponent(cc)}`;
+  window.location.href=url;
+  toast("Mail préparé : ajoutez le fichier HTML ou PDF");
+}
+
+function printDoc(){
+  saveState();
+  document.getElementById('pdf').innerHTML=buildPdfHTML();
+  const w=window.open('','_print');
+  const css=document.querySelector('style').innerHTML;
+  w.document.write(`<html><head><meta charset="utf-8"><style>${css} #pdf{position:static;left:0;width:100%;}</style></head><body>${document.getElementById('pdf').outerHTML}</body></html>`);
+  w.document.close();
+  setTimeout(()=>{w.focus();w.print();},600);
+}
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove('show'),2600);}
+
+/* ---------- INIT ---------- */
+renderPieces();
+initSig('sigProp');initSig('sigLoc');
+if(!document.getElementById('f_date').value)document.getElementById('f_date').valueAsDate=new Date();
+loadState();
+</script>
+</body>
+</html>
